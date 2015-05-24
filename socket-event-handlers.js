@@ -101,7 +101,7 @@ module.exports = function(socket, tree) {
 				retVal = method.apply(socket, data.args);
 			} catch (err) {
 				//we explicitly print the error into the console, because uncatched errors should not occur
-				console.error('RPC method inovcation ' + data.fnPath + '  thrown an error : ', err);
+				console.error('RPC method invocation ' + data.fnPath + ' thrown an error : ', err);
 				emitRes('reject', {reason: err.toJSON()});
 				return;
 			}
