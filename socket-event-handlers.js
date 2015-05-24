@@ -49,7 +49,7 @@ module.exports = function(socket, tree, socketId) {
 			var dfd = Promise.defer();
 
 			if (!socket.connected) {
-				dfd.reject(new Error('client ' + socketId + ' disconnected, call rejected'));
+				dfd.reject(new Error('socket ' + socketId + ' disconnected, call rejected'));
 				return dfd.promise;
 			}
 			invocationCounter++;
@@ -131,7 +131,7 @@ module.exports = function(socket, tree, socketId) {
 
 		if (!methods) {
 			socket.emit('noSuchNode', path);
-			debug('client requested node ' + path + ' which was not found');
+			debug('socket ', socketId ,' requested node ' + path + ' which was not found');
 			return;
 		}
 		var localFnTree = traverse(methods).map(function(el) {
@@ -143,7 +143,7 @@ module.exports = function(socket, tree, socketId) {
 		});
 
 		socket.emit('node', {path: path, tree: localFnTree});
-		debug('client requested node "' + path + '" which was sent as: ', localFnTree);
+		debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree);
 
 	}).on('node', function(data) {
 		if (socket.remoteNodes[data.path]) {
@@ -161,11 +161,11 @@ module.exports = function(socket, tree, socketId) {
 			socket.remoteNodes[data.path] = remoteMethods;
 			promise.resolve(remoteMethods);
 		} else {
-			throw new Error("server sent a node which was not requested");
+			throw new Error('socket ' + socketId + ' sent a node which was not requested');
 		}
 	}).on('noSuchNode', function(path) {
 		var dfd = socket.remoteNodes[path];
-		var err = new Error('Node is not defined on the client');
+		var err = new Error('Node is not defined on the socket ' + socketId);
 		err.path = path;
 		dfd.reject(err);
 	}).on('resolve', function(data) {
@@ -189,7 +189,7 @@ module.exports = function(socket, tree, socketId) {
 		socket.on('disconnect', function onDisconnect() {
 			socket.connected = false;
 			deferreds.forEach(function(dfd, id) {
-				dfd.reject(new Error('client ' + socketId + ' disconnected before returning, call rejected'));
+				dfd.reject(new Error('socket ' + socketId + ' disconnected before returning, call rejected'));
 				remoteCallEnded(id);
 			});
 		});
