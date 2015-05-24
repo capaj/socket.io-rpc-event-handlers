@@ -1,5 +1,5 @@
 var logger = require('debug');
-var debug = logger('socket.io-rpc:handlers');
+var debug = logger('socket.io-rpc');
 var traverse = require('traverse');
 var noop = function(){};
 
