@@ -73,11 +73,9 @@ module.exports = function(socket, tree) {
 	socket.connected = true;
 	socket.on('connect', function() {
 		socketId = socket.io.engine.id;
-		console.log("socket.id ", socketId);
 	}).on('connect_error', function(err) {
 		debug('unable to connect through socket.io');
 		for (var nodePath in remoteNodes) {
-			console.log("remoteNodes[nodePath]", remoteNodes[nodePath]);
 			remoteNodes[nodePath].reject(err)
 		}
 	}).on('call', function(data) {
@@ -212,10 +210,5 @@ module.exports = function(socket, tree) {
 		}
 
 	};
-	/**
-	 * @param toExtendWith {Object}
-	 */
-	socket.rpc.expose = function(toExtendWith) {
-		assign(tree, toExtendWith);
-	};
+	
 };
