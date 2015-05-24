@@ -6,9 +6,8 @@ var noop = function(){};
 /**
  * @param {Object} socket
  * @param {Object} tree
- * @param {String} socketId
  */
-module.exports = function(socket, tree, socketId) {
+module.exports = function(socket, tree) {
 	/**
 	 * for external use, simple function is used rather than an event emitter, because we lack event emitter in the browser
 	 * @type {{batchStarts: Function, batchEnds: Function, call: Function, response: Function}}
@@ -19,6 +18,7 @@ module.exports = function(socket, tree, socketId) {
 		call: noop,
 		response: noop
 	};
+	var socketId;
 	var deferreds = [];
 
 	var invocationCounter = 0;
@@ -49,7 +49,7 @@ module.exports = function(socket, tree, socketId) {
 			var dfd = Promise.defer();
 
 			if (!socket.connected) {
-				dfd.reject(new Error('client ' + socketId + ' disconnected, call rejected'));
+				dfd.reject(new Error('socket ' + socketId + ' disconnected, call rejected'));
 				return dfd.promise;
 			}
 			invocationCounter++;
@@ -68,8 +68,19 @@ module.exports = function(socket, tree, socketId) {
 
 	socket.rpc = prepareRemoteCall;
 	socket.rpc.events = eventHandlers;
+	var remoteNodes = {};
 
-	socket.on('call', function(data) {
+	socket.connected = true;
+	socket.on('connect', function() {
+		socketId = socket.io.engine.id;
+		console.log("socket.id ", socketId);
+	}).on('connect_error', function(err) {
+		debug('unable to connect through socket.io');
+		for (var nodePath in remoteNodes) {
+			console.log("remoteNodes[nodePath]", remoteNodes[nodePath]);
+			remoteNodes[nodePath].reject(err)
+		}
+	}).on('call', function(data) {
 		debug('invocation with ', data);
 		if (!(data && typeof data.Id === 'number')) {
 			return socket.emit('rpcError', {
@@ -131,7 +142,7 @@ module.exports = function(socket, tree, socketId) {
 
 		if (!methods) {
 			socket.emit('noSuchNode', path);
-			debug('client requested node ' + path + ' which was not found');
+			debug('socket ', socketId ,' requested node ' + path + ' which was not found');
 			return;
 		}
 		var localFnTree = traverse(methods).map(function(el) {
@@ -143,10 +154,10 @@ module.exports = function(socket, tree, socketId) {
 		});
 
 		socket.emit('node', {path: path, tree: localFnTree});
-		debug('client requested node "' + path + '" which was sent as: ', localFnTree);
+		debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree);
 
 	}).on('node', function(data) {
-		if (socket.remoteNodes[data.path]) {
+		if (remoteNodes[data.path]) {
 			var remoteMethods = traverse(data.tree).map(function(el) {
 				if (this.isLeaf) {
 					var path = this.path.join('.');
@@ -157,15 +168,14 @@ module.exports = function(socket, tree, socketId) {
 					this.update(prepareRemoteCall(path));
 				}
 			});
-			var promise = socket.remoteNodes[data.path];
-			socket.remoteNodes[data.path] = remoteMethods;
+			var promise = remoteNodes[data.path];
 			promise.resolve(remoteMethods);
 		} else {
-			throw new Error("server sent a node which was not requested");
+			throw new Error('socket ' + socketId + ' sent a node which was not requested');
 		}
 	}).on('noSuchNode', function(path) {
-		var dfd = socket.remoteNodes[path];
-		var err = new Error('Node is not defined on the client');
+		var dfd = remoteNodes[path];
+		var err = new Error('Node is not defined on the socket ' + socketId);
 		err.path = path;
 		dfd.reject(err);
 	}).on('resolve', function(data) {
@@ -178,8 +188,6 @@ module.exports = function(socket, tree, socketId) {
 		debug('reconnected rpc');
 	});
 
-	socket.remoteNodes = {};
-
 	/**
 	 *
 	 * @param path
@@ -189,12 +197,11 @@ module.exports = function(socket, tree, socketId) {
 		socket.on('disconnect', function onDisconnect() {
 			socket.connected = false;
 			deferreds.forEach(function(dfd, id) {
-				dfd.reject(new Error('client ' + socketId + ' disconnected before returning, call rejected'));
+				dfd.reject(new Error('socket ' + socketId + ' disconnected before returning, call rejected'));
 				remoteCallEnded(id);
 			});
 		});
 
-		var remoteNodes = socket.remoteNodes;
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
