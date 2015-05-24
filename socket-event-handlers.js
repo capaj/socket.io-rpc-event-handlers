@@ -6,9 +6,8 @@ var noop = function(){};
 /**
  * @param {Object} socket
  * @param {Object} tree
- * @param {String} socketId
  */
-module.exports = function(socket, tree, socketId) {
+module.exports = function(socket, tree) {
 	/**
 	 * for external use, simple function is used rather than an event emitter, because we lack event emitter in the browser
 	 * @type {{batchStarts: Function, batchEnds: Function, call: Function, response: Function}}
@@ -19,6 +18,7 @@ module.exports = function(socket, tree, socketId) {
 		call: noop,
 		response: noop
 	};
+	var socketId;
 	var deferreds = [];
 
 	var invocationCounter = 0;
@@ -68,8 +68,19 @@ module.exports = function(socket, tree, socketId) {
 
 	socket.rpc = prepareRemoteCall;
 	socket.rpc.events = eventHandlers;
+	var remoteNodes = {};
 
-	socket.on('call', function(data) {
+	socket.connected = true;
+	socket.on('connect', function() {
+		socketId = socket.io.engine.id;
+		console.log("socket.id ", socketId);
+	}).on('connect_error', function(err) {
+		debug('unable to connect through socket.io');
+		for (var nodePath in remoteNodes) {
+			console.log("remoteNodes[nodePath]", remoteNodes[nodePath]);
+			remoteNodes[nodePath].reject(err)
+		}
+	}).on('call', function(data) {
 		debug('invocation with ', data);
 		if (!(data && typeof data.Id === 'number')) {
 			return socket.emit('rpcError', {
@@ -146,7 +157,7 @@ module.exports = function(socket, tree, socketId) {
 		debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree);
 
 	}).on('node', function(data) {
-		if (socket.remoteNodes[data.path]) {
+		if (remoteNodes[data.path]) {
 			var remoteMethods = traverse(data.tree).map(function(el) {
 				if (this.isLeaf) {
 					var path = this.path.join('.');
@@ -157,14 +168,13 @@ module.exports = function(socket, tree, socketId) {
 					this.update(prepareRemoteCall(path));
 				}
 			});
-			var promise = socket.remoteNodes[data.path];
-			socket.remoteNodes[data.path] = remoteMethods;
+			var promise = remoteNodes[data.path];
 			promise.resolve(remoteMethods);
 		} else {
 			throw new Error('socket ' + socketId + ' sent a node which was not requested');
 		}
 	}).on('noSuchNode', function(path) {
-		var dfd = socket.remoteNodes[path];
+		var dfd = remoteNodes[path];
 		var err = new Error('Node is not defined on the socket ' + socketId);
 		err.path = path;
 		dfd.reject(err);
@@ -177,8 +187,6 @@ module.exports = function(socket, tree, socketId) {
 	}).on('reconnect', function() {
 		debug('reconnected rpc');
 	});
-
-	socket.remoteNodes = {};
 
 	/**
 	 *
@@ -194,7 +202,6 @@ module.exports = function(socket, tree, socketId) {
 			});
 		});
 
-		var remoteNodes = socket.remoteNodes;
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
