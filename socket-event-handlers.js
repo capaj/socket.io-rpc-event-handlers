@@ -1,13 +1,14 @@
 var logger = require('debug');
-var debug = logger('socket.io-rpc');
 var traverse = require('traverse');
 var noop = function(){};
 
 /**
  * @param {Object} socket
  * @param {Object} tree
+ * @param {String} clientOrServer
  */
-module.exports = function(socket, tree) {
+module.exports = function(socket, tree, clientOrServer) {
+	var debug = logger('socket.io-rpc:' + clientOrServer);
 	/**
 	 * for external use, simple function is used rather than an event emitter, because we lack event emitter in the browser
 	 * @type {{batchStarts: Function, batchEnds: Function, call: Function, response: Function}}
@@ -46,15 +47,15 @@ module.exports = function(socket, tree) {
 	 */
 	function prepareRemoteCall(fnPath) {
 		return function remoteCall() {
+			var args = Array.prototype.slice.call(arguments, 0);
 			return new Promise(function (resolve, reject){
-				if (!socket.connected) {
+				if (rpc.reconnecting) {
 					reject(new Error('socket ' + socketId + ' disconnected, call rejected'));
-
 				}
 				invocationCounter++;
-				debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter)
+				debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter);
 				socket.emit('call',
-					{Id: invocationCounter, fnPath: fnPath, args: Array.prototype.slice.call(arguments, 0)}
+					{Id: invocationCounter, fnPath: fnPath, args: args}
 				);
 				if (invocationCounter == 1) {
 					eventHandlers.batchStarts(invocationCounter);
@@ -63,14 +64,34 @@ module.exports = function(socket, tree) {
 			});
 		};
 	}
-
-	socket.rpc = prepareRemoteCall;
+	var rpc = prepareRemoteCall;
+	socket.rpc = rpc;
 	socket.rpc.events = eventHandlers;
 	var remoteNodes = {};
 
-	socket.connected = true;
-	socket.on('connect', function() {
-		socketId = socket.io.engine.id;
+	/**
+	 * @type {boolean} indicates when client is reconnecting
+	 */
+	rpc.reconnecting = false;
+
+	if (clientOrServer === 'client') {
+		rpc.initializedP = new Promise(function (resolve, reject){
+			socket.on('connect', function() {
+				socketId = socket.id || socket.io.engine.id;
+				debug('connected socket ', socketId);
+				resolve();
+			}).on('connect_error', function(err) {
+				if (!socketId) {
+					reject(err);
+				}
+			});
+		});
+	} else {
+		socketId = socket.id;
+	}
+
+	socket.on('disconnect', function onDisconnect() {
+		rpc.reconnecting = true;
 	}).on('connect_error', function(err) {
 		debug('unable to connect through socket.io');
 		for (var nodePath in remoteNodes) {
@@ -128,6 +149,8 @@ module.exports = function(socket, tree) {
 			emitRes('reject', {reason: new Error(msg).toJSON()});
 		}
 	}).on('fetchNode', function(path) {
+		debug('fetchNode handler, path ', path);
+
 		var methods = tree;
 		if (path) {
 			methods = traverse(tree).get(path.split('.'));
@@ -151,23 +174,23 @@ module.exports = function(socket, tree) {
 		socket.emit('node', {path: path, tree: localFnTree});
 		debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree);
 
-	}).on('node', function(preNodePath) {
-		console.log("aaa");
-		if (remoteNodes[preNodePath]) {
-			var remoteMethods = traverse(tree).map(function(el) {
+	}).on('node', function(data) {
+		if (remoteNodes[data.path]) {
+			var remoteMethods = traverse(data.tree).map(function(el) {
 				if (this.isLeaf) {
+					debug('path', this.path);
 					var path = this.path.join('.');
-					if (preNodePath) {
-						path = preNodePath + '.' + path;
+					if (data.path) {
+						path = data.path + '.' + path;
 					}
 
 					this.update(prepareRemoteCall(path));
 				}
 			});
-			var promise = remoteNodes[preNodePath];
+			var promise = remoteNodes[data.path];
 			promise.resolve(remoteMethods);
 		} else {
-			throw new Error('socket ' + socketId + ' sent a node which was not requested');
+			console.warn('socket ' + socketId + ' sent a node ' + data.path + ' which was not requested, ignoring');
 		}
 	}).on('noSuchNode', function(path) {
 		var dfd = remoteNodes[path];
@@ -181,7 +204,8 @@ module.exports = function(socket, tree) {
 		deferreds[data.Id].reject(data.reason);
 		remoteCallEnded(data.Id);
 	}).on('reconnect', function() {
-		debug('reconnected rpc');
+		debug('reconnected rpc with ', socketId);
+		rpc.reconnecting = false;
 	});
 
 	/**
@@ -191,25 +215,18 @@ module.exports = function(socket, tree) {
 	 */
 	socket.rpc.fetchNode = function(path) {
 
-		socket.on('disconnect', function onDisconnect() {
-			socket.connected = false;
-			deferreds.forEach(function(dfd, id) {
-				dfd.reject(new Error('socket ' + socketId + ' disconnected before returning, call rejected'));
-				remoteCallEnded(id);
-			});
-		});
-
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
-			var p = new Promise(function (resolve, reject){
-				remoteNodes[path] = {resolve: resolve, reject: reject, promise: p};
-				socket.emit('fetchNode', path);
+			return rpc.initializedP.then(function() {
+				var p = new Promise(function (resolve, reject){
+					remoteNodes[path] = {resolve: resolve, reject: reject, promise: p};
+					socket.emit('fetchNode', path);
+				});
+
+				return p;
 			});
-
-			return p;
 		}
-
 	};
-	
+
 };
