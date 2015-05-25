@@ -209,7 +209,7 @@ module.exports = function(socket, tree, clientOrServer) {
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
-			return rpc.initializedP.then(function() {
+			return Promise.resolve(rpc.initializedP).then(function() {
 				var p = new Promise(function (resolve, reject){
 					remoteNodes[path] = {resolve: resolve, reject: reject, promise: p};
 					socket.emit('fetchNode', path);
