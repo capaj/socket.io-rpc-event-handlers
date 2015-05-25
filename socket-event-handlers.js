@@ -77,7 +77,7 @@ module.exports = function(socket, tree, clientOrServer) {
 	if (clientOrServer === 'client') {
 		rpc.initializedP = new Promise(function (resolve, reject){
 			socket.on('connect', function() {
-				socketId = socket.id || socket.io.engine.id;
+				socketId = socket.io.engine.id;
 				debug('connected socket ', socketId);
 				resolve();
 			}).on('connect_error', function(err) {
