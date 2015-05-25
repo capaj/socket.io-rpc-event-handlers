@@ -119,29 +119,20 @@ module.exports = function(socket, tree, clientOrServer) {
 			try {
 				retVal = method.apply(socket, data.args);
 			} catch (err) {
-				//we explicitly print the error into the console, because uncatched errors should not occur
+				//we explicitly print the error into the console, because uncaught errors should not occur
 				console.error('RPC method invocation ' + data.fnPath + ' thrown an error : ', err);
 				emitRes('reject', {reason: err.toJSON()});
 				return;
 			}
 
-			if (retVal instanceof Promise) {    // this is async function, so 'return' is emitted after it finishes
-				retVal.then(function(asyncRetVal) {
-					emitRes('resolve', {value: asyncRetVal});
-				}, function(error) {
-					if (error instanceof Error) {
-						error = error.toJSON();
-					}
-					emitRes('reject', {reason: error});
-				});
-			} else {
-				//synchronous
-				if (retVal instanceof Error) {
-					emitRes('reject', {reason: retVal.toString()});
-				} else {
-					emitRes('resolve', {value: retVal});
+			Promise.resolve(retVal).then(function(asyncRetVal) {
+				emitRes('resolve', {value: asyncRetVal});
+			}, function(error) {
+				if (error instanceof Error) {
+					error = error.toJSON();
 				}
-			}
+				emitRes('reject', {reason: error});
+			});
 
 		} else {
 			var msg = 'function is not exposed: ' + data.fnPath;
