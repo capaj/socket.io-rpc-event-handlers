@@ -1,4 +1,5 @@
 var logger = require('debug');
+//var debug = console.log;
 var debug = logger('socket.io-rpc');
 var traverse = require('traverse');
 var noop = function(){};
@@ -46,23 +47,21 @@ module.exports = function(socket, tree) {
 	 */
 	function prepareRemoteCall(fnPath) {
 		return function remoteCall() {
-			var dfd = Promise.defer();
+			return new Promise(function (resolve, reject){
+				if (!socket.connected) {
+					reject(new Error('socket ' + socketId + ' disconnected, call rejected'));
 
-			if (!socket.connected) {
-				dfd.reject(new Error('socket ' + socketId + ' disconnected, call rejected'));
-				return dfd.promise;
-			}
-			invocationCounter++;
-			debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter)
-			socket.emit('call',
-				{Id: invocationCounter, fnPath: fnPath, args: Array.prototype.slice.call(arguments, 0)}
-			);
-			if (invocationCounter == 1) {
-				eventHandlers.batchStarts(invocationCounter);
-			}
-			deferreds[invocationCounter] = dfd;
-
-			return dfd.promise;
+				}
+				invocationCounter++;
+				debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter)
+				socket.emit('call',
+					{Id: invocationCounter, fnPath: fnPath, args: Array.prototype.slice.call(arguments, 0)}
+				);
+				if (invocationCounter == 1) {
+					eventHandlers.batchStarts(invocationCounter);
+				}
+				deferreds[invocationCounter] = {resolve: resolve, reject: reject};
+			});
 		};
 	}
 
@@ -130,8 +129,8 @@ module.exports = function(socket, tree) {
 			emitRes('reject', {reason: new Error(msg).toJSON()});
 		}
 	}).on('fetchNode', function(path) {
-
 		var methods = tree;
+		console.log("feth Node");
 		if (path) {
 			methods = traverse(tree).get(path.split('.'));
 		} else {
@@ -154,19 +153,20 @@ module.exports = function(socket, tree) {
 		socket.emit('node', {path: path, tree: localFnTree});
 		debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree);
 
-	}).on('node', function(data) {
-		if (remoteNodes[data.path]) {
-			var remoteMethods = traverse(data.tree).map(function(el) {
+	}).on('node', function(preNodePath) {
+		console.log("aaa");
+		if (remoteNodes[preNodePath]) {
+			var remoteMethods = traverse(tree).map(function(el) {
 				if (this.isLeaf) {
 					var path = this.path.join('.');
-					if (data.path) {
-						path = data.path + '.' + path;
+					if (preNodePath) {
+						path = preNodePath + '.' + path;
 					}
 
 					this.update(prepareRemoteCall(path));
 				}
 			});
-			var promise = remoteNodes[data.path];
+			var promise = remoteNodes[preNodePath];
 			promise.resolve(remoteMethods);
 		} else {
 			throw new Error('socket ' + socketId + ' sent a node which was not requested');
@@ -192,6 +192,7 @@ module.exports = function(socket, tree) {
 	 * @returns {*}
 	 */
 	socket.rpc.fetchNode = function(path) {
+
 		socket.on('disconnect', function onDisconnect() {
 			socket.connected = false;
 			deferreds.forEach(function(dfd, id) {
@@ -203,10 +204,12 @@ module.exports = function(socket, tree) {
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
-			var def = Promise.defer();
-			remoteNodes[path] = def;
-			socket.emit('fetchNode', path);
-			return def.promise;
+			var p = new Promise(function (resolve, reject){
+				remoteNodes[path] = {resolve: resolve, reject: reject, promise: p};
+				socket.emit('fetchNode', path);
+			});
+
+			return p;
 		}
 
 	};
