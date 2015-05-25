@@ -1,5 +1,4 @@
 var logger = require('debug');
-//var debug = console.log;
 var debug = logger('socket.io-rpc');
 var traverse = require('traverse');
 var noop = function(){};
@@ -130,7 +129,6 @@ module.exports = function(socket, tree) {
 		}
 	}).on('fetchNode', function(path) {
 		var methods = tree;
-		console.log("feth Node");
 		if (path) {
 			methods = traverse(tree).get(path.split('.'));
 		} else {
