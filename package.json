@@ -1,9 +1,15 @@
 {
   "name": "socket.io-rpc-event-handlers",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "devDependencies": {
     "chai": "^2.3.0",
     "mocha": "^2.2.5"
+  },
+  "jspm": {
+    "dependencies": {
+      "debug": "npm:debug@^2.2.0",
+      "traverse": "npm:traverse@^0.6.6"
+    }
   },
   "description": "contains internal event handling code for socket.io-rpc and socket.io-rpc-client",
   "main": "socket-event-handlers.js",
