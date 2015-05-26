@@ -76,14 +76,23 @@ module.exports = function(socket, tree, clientOrServer) {
 
 	if (clientOrServer === 'client') {
 		rpc.initializedP = new Promise(function (resolve, reject){
-			socket.on('connect', function() {
+			var assignAndResolveInitP = function() {
 				socketId = socket.io.engine.id;
-				debug('connected socket ', socketId);
 				resolve();
+			};
+			socket.on('connect', function() {
+				assignAndResolveInitP();
+				debug('connected socket ', socketId);
 			}).on('connect_error', function(err) {
 				if (!socketId) {
 					reject(err);
 				}
+			}).on('reconnect', function() {
+				if (!socketId) {
+					assignAndResolveInitP();
+				}
+				debug('reconnected rpc socket', socketId);
+				rpc.reconnecting = false;
 			});
 		});
 	} else {
@@ -194,9 +203,6 @@ module.exports = function(socket, tree, clientOrServer) {
 	}).on('reject', function(data) {
 		deferreds[data.Id].reject(data.reason);
 		remoteCallEnded(data.Id);
-	}).on('reconnect', function() {
-		debug('reconnected rpc with ', socketId);
-		rpc.reconnecting = false;
 	});
 
 	/**
