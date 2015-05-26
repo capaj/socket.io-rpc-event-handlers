@@ -1,5 +1,6 @@
 {
   "name": "socket.io-rpc-event-handlers",
+  "version": "0.1.0",
   "devDependencies": {
     "chai": "^2.3.0",
     "mocha": "^2.2.5"
