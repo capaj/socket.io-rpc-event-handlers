@@ -102,7 +102,7 @@ module.exports = function(socket, tree, clientOrServer) {
 	socket.on('disconnect', function onDisconnect() {
 		rpc.reconnecting = true;
 	}).on('connect_error', function(err) {
-		debug('unable to connect through socket.io');
+		debug('connect error: ', err);
 		for (var nodePath in remoteNodes) {
 			remoteNodes[nodePath].reject(err)
 		}
