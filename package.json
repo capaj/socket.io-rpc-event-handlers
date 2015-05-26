@@ -1,8 +1,26 @@
 {
   "name": "socket.io-rpc-event-handlers",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "devDependencies": {
     "chai": "^2.3.0",
     "mocha": "^2.2.5"
-  }
+  },
+  "description": "contains internal event handling code for socket.io-rpc and socket.io-rpc-client",
+  "main": "socket-event-handlers.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capaj/socket.io-rpc-event-handlers.git"
+  },
+  "author": "capajj@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/capaj/socket.io-rpc-event-handlers/issues"
+  },
+  "homepage": "https://github.com/capaj/socket.io-rpc-event-handlers#readme"
 }
