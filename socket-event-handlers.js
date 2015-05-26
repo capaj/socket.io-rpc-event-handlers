@@ -206,21 +206,20 @@ module.exports = function(socket, tree, clientOrServer) {
 	});
 
 	/**
-	 *
-	 * @param path
-	 * @returns {*}
+	 * @param {String} path
+	 * @returns {Promise}
 	 */
 	socket.rpc.fetchNode = function(path) {
-
 		if (remoteNodes.hasOwnProperty(path)) {
 			return remoteNodes[path].promise;
 		} else {
 			return Promise.resolve(rpc.initializedP).then(function() {
 				var p = new Promise(function (resolve, reject){
-					remoteNodes[path] = {resolve: resolve, reject: reject, promise: p};
+					remoteNodes[path] = {resolve: resolve, reject: reject};
+					debug('fetchNode ', path);
 					socket.emit('fetchNode', path);
 				});
-
+				remoteNodes[path].promise = p;
 				return p;
 			});
 		}
