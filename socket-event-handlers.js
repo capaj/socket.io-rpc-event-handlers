@@ -11,12 +11,13 @@ module.exports = function(socket, tree, clientOrServer) {
 	var debug = logger('socket.io-rpc:' + clientOrServer);
 	/**
 	 * for external use, simple function is used rather than an event emitter, because we lack event emitter in the browser
-	 * @type {{batchStarts: Function, batchEnds: Function, call: Function, response: Function}}
+	 * @type {{batchStarts: Function, batchEnds: Function, wasCalled: Function, calling: Function, response: Function}}
 	 */
 	var eventHandlers = {
 		batchStarts: noop,
 		batchEnds: noop,
-		call: noop,
+		calling: noop,
+		wasCalled: noop,
 		response: noop
 	};
 	var socketId;
@@ -54,9 +55,9 @@ module.exports = function(socket, tree, clientOrServer) {
 				}
 				invocationCounter++;
 				debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter);
-				socket.emit('call',
-					{Id: invocationCounter, fnPath: fnPath, args: args}
-				);
+				var callParams = {Id: invocationCounter, fnPath: fnPath, args: args};
+				socket.emit('call', callParams);
+				eventHandlers.calling(callParams);
 				if (invocationCounter == 1) {
 					eventHandlers.batchStarts(invocationCounter);
 				}
@@ -113,9 +114,15 @@ module.exports = function(socket, tree, clientOrServer) {
 				reason: 'Id is a required property for a call data payload'
 			});
 		}
-		var emitRes = function(type, resData) {
+
+		/**
+		 * @param {String} resType
+		 * @param {*} resData
+		 */
+		var emitRes = function(resType, resData) {
 			resData.Id = data.Id;
-			socket.emit(type, resData)
+			socket.emit(resType, resData);
+			eventHandlers.wasCalled(data, resData);
 		};
 		try {
 			var method = traverse(tree).get(data.fnPath.split('.'));
