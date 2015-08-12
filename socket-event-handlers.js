@@ -127,7 +127,7 @@ module.exports = function(socket, tree, clientOrServer) {
 		try {
 			var method = traverse(tree).get(data.fnPath.split('.'));
 		} catch (err) {
-			debug('error when resolving an invocation', err);
+			debug(err, ' when resolving an invocation');
 			return emitRes('reject', {reason: err.toJSON()});
 		}
 		if (method && method.apply) {	//we could also check if it is a function, but this might be bit faster
@@ -136,7 +136,7 @@ module.exports = function(socket, tree, clientOrServer) {
 				retVal = method.apply(socket, data.args);
 			} catch (err) {
 				//we explicitly print the error into the console, because uncaught errors should not occur
-				console.error('sRPC method invocation ' + data.fnPath + ' thrown an error : ', err, err.stack);
+				console.error('RPC method invocation ' + data.fnPath + 'from ' + socket.id + ' thrown an error : ', err.stack);
 				emitRes('reject', {reason: err.toJSON()});
 				return;
 			}
