@@ -2,11 +2,11 @@ var logger = require('debug')
 var traverse = require('traverse')
 var noop = function () {}
 var errToPOJO = function (err) {
-  return {stack: err.stack, message: err.message}
+  return {error: {stack: err.stack, message: err.message}}
 }
-if (process.env.NODE_ENV === 'production') {
+if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') {
   errToPOJO = function (err) {
-    return {message: err.message}
+    return {error: {message: err.message}}
   }
 }
 
@@ -211,7 +211,7 @@ module.exports = function (socket, tree, clientOrServer) {
     deferreds[data.Id].resolve(data.value)
     remoteCallEnded(data.Id)
   }).on('reject', function (data) {
-    deferreds[data.Id].reject(data.reason)
+    deferreds[data.Id].reject(data.error)
     remoteCallEnded(data.Id)
   })
 
