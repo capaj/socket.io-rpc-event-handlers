@@ -157,7 +157,7 @@ module.exports = function (socket, tree, clientOrServer) {
     } else {
       var msg = 'no function exposed on: ' + data.fnPath
       debug(msg)
-      emitRes('reject', {message: msg})
+      emitRes('reject', {error: {message: msg}})
     }
   }).on('fetchNode', function (path) {
     debug('fetchNode handler, path ', path)
@@ -223,14 +223,10 @@ module.exports = function (socket, tree, clientOrServer) {
     if (remoteNodes.hasOwnProperty(path)) {
       return remoteNodes[path].promise
     } else {
-      return Promise.resolve(rpc.initializedP).then(function () {
-        var p = new Promise(function (resolve, reject) {
-          remoteNodes[path] = {resolve: resolve, reject: reject}
-          debug('fetchNode ', path)
-          socket.emit('fetchNode', path)
-        })
-        remoteNodes[path].promise = p
-        return p
+      return new Promise(function (resolve, reject) {
+        remoteNodes[path] = {resolve: resolve, reject: reject}
+        debug('fetchNode ', path)
+        socket.emit('fetchNode', path)
       })
     }
   }
