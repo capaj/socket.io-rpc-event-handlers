@@ -54,8 +54,8 @@ module.exports = function (socket, tree, clientOrServer) {
    * @param {String} fnPath
    * @returns {Function} which will call the backend/client when executed
    */
-  function prepareRemoteCall (fnPath) {
-    return function remoteCall () {
+  function prepareRemoteCall (fnPath, argumentLength) {
+    function remoteCall () {
       var args = Array.prototype.slice.call(arguments, 0)
       return new Promise(function (resolve, reject) {
         if (rpc.reconnecting) {
@@ -72,6 +72,10 @@ module.exports = function (socket, tree, clientOrServer) {
         deferreds[invocationCounter] = {resolve: resolve, reject: reject}
       })
     }
+
+    remoteCall.length = argumentLength
+
+    return remoteCall
   }
   var rpc = prepareRemoteCall
   socket.rpc = rpc
@@ -176,7 +180,7 @@ module.exports = function (socket, tree, clientOrServer) {
     }
     var localFnTree = traverse(methods).map(function (el) {
       if (this.isLeaf) {
-        return null
+        return el.length
       } else {
         return el
       }
@@ -194,7 +198,7 @@ module.exports = function (socket, tree, clientOrServer) {
             path = data.path + '.' + path
           }
 
-          this.update(prepareRemoteCall(path))
+          this.update(prepareRemoteCall(path, el))
         }
       })
       var promise = remoteNodes[data.path]
