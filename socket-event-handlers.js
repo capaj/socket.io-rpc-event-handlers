@@ -73,7 +73,7 @@ module.exports = function (socket, tree, clientOrServer) {
       })
     }
 
-    remoteCall.length = argumentLength
+    remoteCall.remoteLength = argumentLength
 
     return remoteCall
   }
