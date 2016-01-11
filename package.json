@@ -8,7 +8,8 @@
   "jspm": {
     "dependencies": {
       "debug": "npm:debug@^2.2.0",
-      "traverse": "npm:traverse@^0.6.6"
+      "traverse": "npm:traverse@^0.6.6",
+      "serialize-error": "npm:serialize-error@^1.1.0"
     }
   },
   "description": "contains internal event handling code for socket.io-rpc and socket.io-rpc-client",
