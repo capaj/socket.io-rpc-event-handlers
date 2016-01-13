@@ -1,15 +1,7 @@
 var logger = require('debug')
 var traverse = require('traverse')
-var serializeError = require('serialize-error')
+var errToPOJO = require('./lib/err-serialization')
 var noop = function () {}
-var errToPOJO = function (err) {
-  return serializeError(err)
-}
-if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') {
-  errToPOJO = function (err) {
-    return {error: {message: err.message}}
-  }
-}
 
 /**
  * @param {Object} socket
