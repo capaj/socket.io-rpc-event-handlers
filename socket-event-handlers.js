@@ -79,7 +79,6 @@ module.exports = function (socket, tree, clientOrServer) {
   var rpc = prepareRemoteCall
   socket.rpc = rpc
   socket.rpc.events = eventHandlers
-  var remoteNodes = {}
 
   /**
    * @type {boolean} indicates when client is reconnecting
@@ -115,9 +114,6 @@ module.exports = function (socket, tree, clientOrServer) {
     rpc.reconnecting = true
   }).on('connect_error', function (err) {
     debug('connect error: ', err)
-    for (var nodePath in remoteNodes) {
-      remoteNodes[nodePath].reject(err)
-    }
   }).on('call', function (data) {
     debug('invocation with ', data)
     if (!(data && typeof data.Id === 'number')) {
