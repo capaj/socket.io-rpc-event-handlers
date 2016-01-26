@@ -1,8 +1,14 @@
 var logger = require('debug')
 var traverse = require('traverse')
+var co = require('co')
 var errToPOJO = require('./lib/err-serialization')
 var noop = function () {}
 
+function isGeneratorFunction (fn) {
+  return typeof fn === 'function' &&
+    fn.constructor &&
+    fn.constructor.name === 'GeneratorFunction'
+}
 /**
  * @param {Object} socket
  * @param {Object} tree
@@ -129,6 +135,7 @@ module.exports = function (socket, tree, clientOrServer) {
       socket.emit(resType, resData)
       eventHandlers.wasCalled(data, resData)
     }
+
     try {
       var method = traverse(tree).get(data.fnPath.split('.'))
     } catch (err) {
@@ -137,15 +144,16 @@ module.exports = function (socket, tree, clientOrServer) {
     }
     if (method && method.apply) { // we could also check if it is a function, but this might be bit faster
       var retVal
+      if (isGeneratorFunction(method)) {
+        method = co.wrap(method)
+      }
       try {
         retVal = method.apply(socket, data.args)
       } catch (err) {
-        // we explicitly print the error into the console, because uncaught errors should not occur
-        console.error('RPC method invocation ' + data.fnPath + 'from ' + socket.id + ' thrown an error : ', err.stack)
+        debug('RPC method invocation ' + data.fnPath + 'from ' + socket.id + ' thrown an error : ', err.stack)
         emitRes('reject', errToPOJO(err))
         return
       }
-
       Promise.resolve(retVal).then(function (asyncRetVal) {
         emitRes('resolve', {value: asyncRetVal})
       }, function (error) {
