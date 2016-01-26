@@ -164,7 +164,7 @@ module.exports = function (socket, tree, clientOrServer) {
       debug(msg)
       emitRes('reject', {error: {message: msg}})
     }
-  }).on('fetchNode', function (path) {
+  }).on('fetchNode', function (path, resCB) {
     debug('fetchNode handler, path ', path)
 
     var methods = tree
@@ -175,7 +175,7 @@ module.exports = function (socket, tree, clientOrServer) {
     }
 
     if (!methods) {
-      socket.emit('noSuchNode', path)
+      resCB({path: path})
       debug('socket ', socketId, ' requested node ' + path + ' which was not found')
       return
     }
@@ -186,32 +186,8 @@ module.exports = function (socket, tree, clientOrServer) {
         return el
       }
     })
-
-    socket.emit('node', {path: path, tree: localFnTree})
+    resCB({path: path, tree: localFnTree})
     debug('socket ', socketId, ' requested node "' + path + '" which was sent as: ', localFnTree)
-  }).on('node', function (data) {
-    if (remoteNodes[data.path]) {
-      var remoteMethods = traverse(data.tree).map(function (el) {
-        if (this.isLeaf) {
-          debug('path', this.path)
-          var path = this.path.join('.')
-          if (data.path) {
-            path = data.path + '.' + path
-          }
-
-          this.update(prepareRemoteCall(path, el))
-        }
-      })
-      var promise = remoteNodes[data.path]
-      promise.resolve(remoteMethods)
-    } else {
-      console.warn('socket ' + socketId + ' sent a node ' + data.path + ' which was not requested, ignoring')
-    }
-  }).on('noSuchNode', function (path) {
-    var dfd = remoteNodes[path]
-    var err = new Error('Node is not defined on the socket ' + socketId)
-    err.path = path
-    dfd.reject(err)
   }).on('resolve', function (data) {
     deferreds[data.Id].resolve(data.value)
     remoteCallEnded(data.Id)
@@ -225,14 +201,28 @@ module.exports = function (socket, tree, clientOrServer) {
    * @returns {Promise}
    */
   socket.rpc.fetchNode = function (path) {
-    if (remoteNodes.hasOwnProperty(path)) {
-      return remoteNodes[path].promise
-    } else {
-      return new Promise(function (resolve, reject) {
-        remoteNodes[path] = {resolve: resolve, reject: reject}
-        debug('fetchNode ', path)
-        socket.emit('fetchNode', path)
+    return new Promise((resolve, reject) => {
+      debug('fetchNode ', path)
+      socket.emit('fetchNode', path, function (data) {
+        if (data.tree) {
+          var remoteMethods = traverse(data.tree).map(function (el) {
+            if (this.isLeaf) {
+              debug('path', this.path)
+              var path = this.path.join('.')
+              if (data.path) {
+                path = data.path + '.' + path
+              }
+
+              this.update(prepareRemoteCall(path, el))
+            }
+          })
+          resolve(remoteMethods)
+        } else {
+          var err = new Error('Node is not defined on the socket ' + socketId)
+          err.path = data.path
+          reject(err)
+        }
       })
-    }
+    })
   }
 }
