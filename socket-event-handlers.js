@@ -198,6 +198,10 @@ module.exports = function (socket, tree, clientOrServer) {
    */
   socket.rpc.fetchNode = function (path) {
     return new Promise(function (resolve, reject) {
+      socket.once('connect_error', function (err) {
+        debug('connect error: ', err)
+        reject(err)
+      })
       debug('fetchNode ', path)
       socket.emit('fetchNode', path, function (data) {
         if (data.tree) {
