@@ -57,9 +57,6 @@ module.exports = function (socket, tree, clientOrServer) {
     function remoteCall () {
       var args = Array.prototype.slice.call(arguments, 0)
       return new Promise(function (resolve, reject) {
-        if (rpc.reconnecting) {
-          reject(new Error('socket ' + socketId + ' disconnected, call rejected'))
-        }
         invocationCounter++
         debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter)
         var callParams = {Id: invocationCounter, fnPath: fnPath, args: args}

@@ -36,3 +36,33 @@ describe('socket-event-handlers', function () {
     expect(typeof socketMock.rpc).to.equal('function')
   })
 })
+
+describe('resilience', function () {
+  // socket.io connection is treated as something reliable-if we're reconnecting, we're optimistic about reconnection in the near future, so it makes little sense to reject an RPC call like we had previous to version 1.1.5
+  it('should not reject an RPC call if reconnecting', function (done) {
+    const emits = []
+    const socketMock = {
+      on: () => {
+        return socketMock
+      },
+      id: 'fakeSocketId',
+      emit: (emitName, params) => {
+        emits.push({emitName, params})
+      }
+    }
+    const evHandlers = require('../socket-event-handlers')
+    evHandlers(socketMock, {}, 'server')
+    socketMock.rpc.reconnecting = true
+    socketMock.rpc('anyPath')().then(() => {
+      setTimeout(() => {
+        throw new Error('Must not happen')
+      })
+    }, () => {
+      setTimeout(() => {
+        throw new Error('Must not happen')
+      })
+    })
+    expect(emits[0].emitName).to.equal('call')
+    setTimeout(done, 50)
+  })
+})
