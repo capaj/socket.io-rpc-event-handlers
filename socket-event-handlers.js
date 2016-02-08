@@ -57,6 +57,9 @@ module.exports = function (socket, tree, clientOrServer) {
     function remoteCall () {
       var args = Array.prototype.slice.call(arguments, 0)
       return new Promise(function (resolve, reject) {
+        if (clientOrServer === 'server' && rpc.disconnected) {
+          return reject(new Error('socket ' + socketId + ' disconnected, call rejected'))
+        }
         invocationCounter++
         debug('calling ', fnPath, 'on ', socketId, ', invocation counter ', invocationCounter)
         var callParams = {Id: invocationCounter, fnPath: fnPath, args: args}
@@ -78,9 +81,9 @@ module.exports = function (socket, tree, clientOrServer) {
   socket.rpc.events = eventHandlers
 
   /**
-   * @type {boolean} indicates when client is reconnecting
+   * @type {boolean} indicates when client is disconnected
    */
-  rpc.reconnecting = false
+  rpc.disconnected = false
 
   if (clientOrServer === 'client') {
     rpc.initializedP = new Promise(function (resolve, reject) {
@@ -100,7 +103,7 @@ module.exports = function (socket, tree, clientOrServer) {
           assignAndResolveInitP()
         }
         debug('reconnected rpc socket', socketId)
-        rpc.reconnecting = false
+        rpc.disconnected = false
       })
     })
   } else {
@@ -108,7 +111,7 @@ module.exports = function (socket, tree, clientOrServer) {
   }
 
   socket.on('disconnect', function onDisconnect () {
-    rpc.reconnecting = true
+    rpc.disconnected = true
   }).on('connect_error', function (err) {
     debug('connect error: ', err)
   }).on('call', function (data) {
