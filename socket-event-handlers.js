@@ -68,7 +68,12 @@ module.exports = function (socket, tree, clientOrServer) {
         if (invocationCounter === 1) {
           eventHandlers.batchStarts(invocationCounter)
         }
-        deferreds[invocationCounter] = {resolve: resolve, reject: reject}
+        deferreds[invocationCounter] = {
+          resolve: resolve,
+          reject: reject,
+          fnPath: fnPath,
+          args: args
+        }
       })
     }
 
@@ -188,7 +193,12 @@ module.exports = function (socket, tree, clientOrServer) {
     deferreds[data.Id].resolve(data.value)
     remoteCallEnded(data.Id)
   }).on('reject', function (data) {
-    deferreds[data.Id].reject(data.error)
+    var dfd = deferreds[data.Id]
+    data.error.rpc = {
+      fnPath: dfd.fnPath,
+      args: dfd.args
+    }
+    dfd.reject(data.error)
     remoteCallEnded(data.Id)
   })
 

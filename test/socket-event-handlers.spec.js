@@ -37,6 +37,12 @@ describe('socket-event-handlers', function () {
   })
 })
 
+describe('error handling', function () {
+  it('should reject a promise with "rpc" attribute providing a fnPath and arguments with which the call was made', function (done) {
+    done()
+  })
+})
+
 describe('resilience', function () {
   // socket.io connection is treated as something reliable-if we're reconnecting, we're optimistic about reconnection in the near future, so it makes little sense to reject an RPC call like we had previous to version 1.1.5
   it('should not reject an RPC call if reconnecting', function (done) {
